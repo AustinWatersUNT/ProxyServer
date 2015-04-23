@@ -9,11 +9,11 @@
 #include <netinet/in.h> /* protocol & struct definitions */
 #include <arpa/inet.h>
 #include <netdb.h>
-#include<errno.h>
+#include <errno.h>
 
 #define BACKLOG 	   5
 #define BUF_SIZE	   1024
-#define LISTEN_PORT 	10000
+#define LISTEN_PORT 	30000
 #define SERVER_PORT 	80
 
 int threadCount = BACKLOG;
@@ -115,50 +115,44 @@ void *client_handler(void *sock_desc) {
 
    printf("In client_handler\n");
 
-   while ((msg_size = recv(sock, buf, BUF_SIZE, 0)) > 0) {
+   while ((msg_size = recv(sock, buf, BUF_SIZE, 0)) > 0) { //This grabs a from the browser
 
       buf[msg_size] = 0;
-      printf("Message:\n%s\n\n\n", buf);
+      printf("Message:\n%s\n\n\n", buf); //This prints what the browser sends to server
 
-      getIpAddress("cse.unt.edu", ip);
-      printf("\nSending IP: %s\n", ip);
-      sock_send = destinationSock(ip);
+      //The concated strings below is the what the command from the browser looks like
+      //Except get includes the website and the host is the 129.120.151.94:portNumber
+      //We want to change it below with were google is to be the webside name and where the 
+      //    '/' would be everything that comes after .com so like google.com/drive the string
+      // would be GET /drive /HTTP/1.1 and host would be http://www.google.com
+     
+      getIpAddress("google.com", ip); //retrives the ip address for website and saves it to ip
+      printf("\nSending IP: %s\n", ip); //prints the ip
+      sock_send = destinationSock(ip); //creates a socket to that ip and port 80
 
-      char tempBuf[BUF_SIZE];
+      strcpy(buf, "GET /?gws_rd=ssl HTTP/1.1\r\n");
+      strcat(buf, "Host: www.google.com\r\n"); //want to replace google.com with any website
+      strcat(buf, "Connection: keep-alive\r\n");
+      strcat(buf, "Cache-Control: max-age=0\r\n");
+      strcat(buf, "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n");
+      strcat(buf, "User-Agent: Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36\r\n");
+      strcat(buf, "Accept-Encoding: gzip, deflate, sdch\r\n");
+      strcat(buf, "Accept-Language: en-US,en;q=0.8\r\n\r\n");
 
-      char* pch = strtok (buf,"\n");
-      int j = 0;
-      for(j = 0; j < 9; j++)
-      {
-         if(j == 0) strcpy (tempBuf, "GET / HTTP/1.1\n");
-         else if(j == 1) strcat (tempBuf, "Host: cse.unt.edu\n");
-         /*else {
-            strcat(tempBuf, pch);
-            strcat(tempBuf, "\n");
-         }
-         strcpy(pch, "");
-         pch = strtok (NULL, "\n");*/
-      }
+      send_len=strlen(buf);
+      bytes_sent=send(sock_send,buf,send_len,0);
 
-      printf("tempBuf:\n%s\n\n", tempBuf);
-
-      send_len=strlen(tempBuf);
-      bytes_sent=send(sock_send,tempBuf,send_len,0);
-
-      strcpy(tempBuf, "");
-
-      char* sendBuf = (char*) malloc(sizeof(char) * BUF_SIZE);
-      strcpy(sendBuf, "");
-
-      j = 0;
+      printf("\n\n");
+       //this reads in the response 1024 characters and sends that 1024 characters to the browser
+      //this is also where we would stream buf to a file as well for reading from cache
       while ((msg_size = recv(sock_send, buf, BUF_SIZE, 0)) > 0) {
          buf[msg_size] = 0;
-         printf("Return:\n%s\n\n\n", buf);
+         printf("%s", buf);
          send_len=strlen(buf);
          bytes_sent=send(sock,buf,send_len,0);
-
+         strcpy(buf, "\0");
       }
-      printf("Out of Loop\n");
+      printf("\n\nOut of Loop\n");
       strcpy(buf, "");
       close(sock_send);
    }
@@ -179,7 +173,7 @@ int getIpAddress(char* hostname, char* ip)
     hints.ai_family = AF_UNSPEC; // use AF_INET6 to force IPv6
     hints.ai_socktype = SOCK_STREAM;
  
-    if ( (rv = getaddrinfo( hostname , "http" , &hints , &servinfo)) != 0) 
+    if ( (rv = getaddrinfo( hostname , NULL , NULL , &servinfo)) != 0) 
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
