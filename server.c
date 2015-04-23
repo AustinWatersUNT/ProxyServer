@@ -143,48 +143,57 @@ void *client_handler(void *sock_desc) {
       }
       else
       {
-         getIpAddress(hostname, ip); //retrives the ip address for website and saves it to ip
-      
-         printf("\nSending IP: %s\n", ip); //prints the ip
-         sock_send = destinationSock(ip); //creates a socket to that ip and port 80
-
-         strcpy(buf, "GET /");
-         //strcat(buf, fileRoute);
-         strcat(buf, " HTTP/1.1\r\n");
-         strcat(buf, "Host: ");
-         strcat(buf, url);
-         strcat(buf, "\r\n");
-         strcat(buf, "Connection: keep-alive\r\n");
-         strcat(buf, "Cache-Control: max-age=0\r\n");
-         strcat(buf, "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n");
-         strcat(buf, "User-Agent: Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36\r\n");
-         strcat(buf, "Accept-Encoding: gzip, deflate, sdch\r\n");
-         strcat(buf, "Accept-Language: en-US,en;q=0.8\r\n\r\n");
-
-         send_len=strlen(buf);
-         bytes_sent=send(sock_send,buf,send_len,0);
-   
-         printf("\n\n");
-          //this reads in the response 1024 characters and sends that 1024 characters to the browser
-         //this is also where we would stream buf to a file as well for reading from cache
-
-		 if(strcmp(hostname, "cse.unt.edu") == 0)
+         int fail = getIpAddress(hostname, ip); //retrives the ip address for website and saves it to ip
+         if(fail == 1)
          {
-            strcpy(buf, "HTTP/1.1 200\r\n");
+			strcpy(buf, "HTTP/1.1 404\r\n");
             strcat(buf, "Content-Type: text/html; charset=UTF-8\r\n\r\n");
+            strcat(buf, "<!DOCTYPE html><html><head><title>Page Doesn't Exist</title></head><body><h1>404</h1><p>Webpage not found</p></body></html>");
             send_len=strlen(buf);
             bytes_sent=send(sock,buf,send_len,0);
          }
-         while ((msg_size = recv(sock_send, buf, BUF_SIZE, 0)) > 0) {
-            buf[msg_size] = 0;
-            printf("%s", buf);
+         else
+         {
+            printf("\nSending IP: %s\n", ip); //prints the ip
+            sock_send = destinationSock(ip); //creates a socket to that ip and port 80
+            strcpy(buf, "GET /");
+            //strcat(buf, fileRoute);
+            strcat(buf, " HTTP/1.1\r\n");
+            strcat(buf, "Host: ");
+            strcat(buf, url);
+            strcat(buf, "\r\n");
+            strcat(buf, "Connection: keep-alive\r\n");
+            strcat(buf, "Cache-Control: max-age=0\r\n");
+            strcat(buf, "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n");
+            strcat(buf, "User-Agent: Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36\r\n");
+            strcat(buf, "Accept-Encoding: gzip, deflate, sdch\r\n");
+            strcat(buf, "Accept-Language: en-US,en;q=0.8\r\n\r\n");
+
             send_len=strlen(buf);
-            bytes_sent=send(sock,buf,send_len,0);
-            strcpy(buf, "\0");
+            bytes_sent=send(sock_send,buf,send_len,0);
+      
+            printf("\n\n");
+             //this reads in the response 1024 characters and sends that 1024 characters to the browser
+            //this is also where we would stream buf to a file as well for reading from cache
+
+		    if(strcmp(hostname, "cse.unt.edu") == 0)
+            {
+               strcpy(buf, "HTTP/1.1 200\r\n");
+               strcat(buf, "Content-Type: text/html; charset=UTF-8\r\n\r\n");
+               send_len=strlen(buf);
+               bytes_sent=send(sock,buf,send_len,0);
+            }
+            while ((msg_size = recv(sock_send, buf, BUF_SIZE, 0)) > 0) {
+               buf[msg_size] = 0;
+               printf("%s", buf);
+               send_len=strlen(buf);
+               bytes_sent=send(sock,buf,send_len,0);
+               strcpy(buf, "\0");
+            }
+            printf("\n\nOut of Loop\n");
+            strcpy(buf, "");
+            close(sock_send);
          }
-         printf("\n\nOut of Loop\n");
-         strcpy(buf, "");
-         close(sock_send);
       }
    }
    close(sock);
@@ -236,7 +245,6 @@ int destinationSock(char* ip)
    if (sock_send < 0) {
       printf("socket() failed\n");
       exit(0);
-      return -1;
     }
     else {
       printf("socket created\n");
