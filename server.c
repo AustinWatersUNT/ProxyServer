@@ -13,13 +13,14 @@
 
 #define BACKLOG 	   5
 #define BUF_SIZE	   1024
-#define LISTEN_PORT 	30000
+#define LISTEN_PORT 	8888
 #define SERVER_PORT 	80
 
 int threadCount = BACKLOG;
 void *client_handler(void *arg);
 int getIpAddress(char*, char*);
 int destinationSock(char*);
+int blacklist(char*);
 
 int main(int argc, char *argv[]){
   int status, *sock_tmp;
@@ -118,48 +119,87 @@ void *client_handler(void *sock_desc) {
    while ((msg_size = recv(sock, buf, BUF_SIZE, 0)) > 0) { //This grabs a from the browser
 
       buf[msg_size] = 0;
-      printf("Message:\n%s\n\n\n", buf); //This prints what the browser sends to server
-
-      //The concated strings below is the what the command from the browser looks like
-      //Except get includes the website and the host is the 129.120.151.94:portNumber
-      //We want to change it below with were google is to be the webside name and where the 
-      //    '/' would be everything that comes after .com so like google.com/drive the string
-      // would be GET /drive /HTTP/1.1 and host would be http://www.google.com
+      printf("Message:\n%s\n\n\n", buf);
      
-      getIpAddress("google.com", ip); //retrives the ip address for website and saves it to ip
-      printf("\nSending IP: %s\n", ip); //prints the ip
-      sock_send = destinationSock(ip); //creates a socket to that ip and port 80
+	  char message[BUF_SIZE];
+      strcpy(message, buf);
+      char* url = strtok(message, "/");
+      url = strtok(NULL, " ");
 
-      strcpy(buf, "GET /?gws_rd=ssl HTTP/1.1\r\n");
-      strcat(buf, "Host: www.google.com\r\n"); //want to replace google.com with any website
-      strcat(buf, "Connection: keep-alive\r\n");
-      strcat(buf, "Cache-Control: max-age=0\r\n");
-      strcat(buf, "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n");
-      strcat(buf, "User-Agent: Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36\r\n");
-      strcat(buf, "Accept-Encoding: gzip, deflate, sdch\r\n");
-      strcat(buf, "Accept-Language: en-US,en;q=0.8\r\n\r\n");
+      printf("Weburl: %s\n", url);
+      char tempUrl[100];
+      strcpy(tempUrl, url);
+      char* hostname = strtok(url, "/");
+      char* fileRoute = strtok(NULL, "\0");
 
-      send_len=strlen(buf);
-      bytes_sent=send(sock_send,buf,send_len,0);
-
-      printf("\n\n");
-       //this reads in the response 1024 characters and sends that 1024 characters to the browser
-      //this is also where we would stream buf to a file as well for reading from cache
-      while ((msg_size = recv(sock_send, buf, BUF_SIZE, 0)) > 0) {
-         buf[msg_size] = 0;
-         printf("%s", buf);
-         send_len=strlen(buf);
-         bytes_sent=send(sock,buf,send_len,0);
-         strcpy(buf, "\0");
+      printf("hostname: %s\n", hostname);
+      if(blacklist(hostname) == 0)
+      {
+          strcpy(buf, "HTTP/1.1 200\r\n");
+          strcat(buf, "Content-Type: text/html; charset=UTF-8\r\n\r\n");
+          strcat(buf, "<!DOCTYPE html><html><head><title>Blacklist Page</title></head><body><h1>BLACKLIST</h1><p>THIS SITE IS NOT ALLOWED ON THIS SERVER</p></body></html>");
+          send_len=strlen(buf);
+          bytes_sent=send(sock,buf,send_len,0);
       }
-      printf("\n\nOut of Loop\n");
-      strcpy(buf, "");
-      close(sock_send);
+      else
+      {
+         getIpAddress(hostname, ip); //retrives the ip address for website and saves it to ip
+      
+         printf("\nSending IP: %s\n", ip); //prints the ip
+         sock_send = destinationSock(ip); //creates a socket to that ip and port 80
+
+         strcpy(buf, "GET /");
+         //strcat(buf, fileRoute);
+         strcat(buf, " HTTP/1.1\r\n");
+         strcat(buf, "Host: ");
+         strcat(buf, url);
+         strcat(buf, "\r\n");
+         strcat(buf, "Connection: keep-alive\r\n");
+         strcat(buf, "Cache-Control: max-age=0\r\n");
+         strcat(buf, "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n");
+         strcat(buf, "User-Agent: Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.90 Safari/537.36\r\n");
+         strcat(buf, "Accept-Encoding: gzip, deflate, sdch\r\n");
+         strcat(buf, "Accept-Language: en-US,en;q=0.8\r\n\r\n");
+
+         send_len=strlen(buf);
+         bytes_sent=send(sock_send,buf,send_len,0);
+   
+         printf("\n\n");
+          //this reads in the response 1024 characters and sends that 1024 characters to the browser
+         //this is also where we would stream buf to a file as well for reading from cache
+
+		 if(strcmp(hostname, "cse.unt.edu") == 0)
+         {
+            strcpy(buf, "HTTP/1.1 200\r\n");
+            strcat(buf, "Content-Type: text/html; charset=UTF-8\r\n\r\n");
+            send_len=strlen(buf);
+            bytes_sent=send(sock,buf,send_len,0);
+         }
+         while ((msg_size = recv(sock_send, buf, BUF_SIZE, 0)) > 0) {
+            buf[msg_size] = 0;
+            printf("%s", buf);
+            send_len=strlen(buf);
+            bytes_sent=send(sock,buf,send_len,0);
+            strcpy(buf, "\0");
+         }
+         printf("\n\nOut of Loop\n");
+         strcpy(buf, "");
+         close(sock_send);
+      }
    }
    close(sock);
    free(sock_desc);
    threadCount++;
    // pthread_exit("Thank you for the CPU time");
+}
+
+int blacklist(char* hostname)
+{
+   if(strcmp(hostname, "facebook.com") == 0) return 0;
+   else if(strcmp(hostname, "youtube.com") == 0) return 0;
+   else if(strcmp(hostname, "hulu.com") == 0) return 0;
+   else if(strcmp(hostname, "example.com") == 0) return 0;
+   else return 1;
 }
 
 int getIpAddress(char* hostname, char* ip)
@@ -168,11 +208,7 @@ int getIpAddress(char* hostname, char* ip)
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_in *h;
     int rv;
- 
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC; // use AF_INET6 to force IPv6
-    hints.ai_socktype = SOCK_STREAM;
- 
+
     if ( (rv = getaddrinfo( hostname , NULL , NULL , &servinfo)) != 0) 
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
