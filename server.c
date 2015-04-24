@@ -235,6 +235,7 @@ int blacklist(char* hostname)
    if(strcmp(hostname, "facebook.com") == 0) return 0;
    else if(strcmp(hostname, "youtube.com") == 0) return 0;
    else if(strcmp(hostname, "hulu.com") == 0) return 0;
+   else if(strcmp(hostname, "virus.com") == 0) return 0;
    else if(strcmp(hostname, "example.com") == 0) return 0;
    else return 1;
 }
